@@ -1,0 +1,43 @@
+flat_perform_multidim_analysis.Rmd:
+  path: dev/flat_perform_multidim_analysis.Rmd
+  state: active
+  R: R/get_senso_mapping.R
+  tests: tests/testthat/test-get_senso_mapping.R
+  vignettes: vignettes/represent-the-sensory-space-on-a-map.Rmd
+  inflate:
+    flat_file: dev/flat_perform_multidim_analysis.Rmd
+    vignette_name: Represent the sensory space on a map
+    open_vignette: false
+    check: false
+    document: true
+    overwrite: 'yes'
+flat_perform_prefmap.Rmd:
+  path: dev/flat_perform_prefmap.Rmd
+  state: active
+  R: R/get_prefmap.R
+  tests: tests/testthat/test-get_prefmap.R
+  vignettes: vignettes/link-the-sensory-space-and-the-liking-to-detect-an-optimum-product.Rmd
+  inflate:
+    flat_file: dev/flat_perform_prefmap.Rmd
+    vignette_name: Link the sensory space and the liking to detect an optimum product
+    open_vignette: false
+    check: false
+    document: true
+    overwrite: 'yes'
+flat_utils.Rmd:
+  path: dev/flat_utils.Rmd
+  state: active
+  R:
+  - R/get_date_from_file_name.R
+  - R/predict_like.R
+  tests:
+  - tests/testthat/test-get_date_from_file_name.R
+  - tests/testthat/test-predict_like.R
+  vignettes: []
+  inflate:
+    flat_file: dev/flat_utils.Rmd
+    vignette_name: .na
+    open_vignette: true
+    check: false
+    document: true
+    overwrite: ask

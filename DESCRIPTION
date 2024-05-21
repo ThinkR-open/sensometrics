@@ -1,0 +1,33 @@
+Package: sensometrics
+Title: Provide Sensory Analysis Tools For A Demo Purpose At Sensometrics
+    2024
+Version: 0.0.0.9000
+Authors@R: c(
+    person("Margot", "Brard", , "margot@thinkr.fr", role = c("aut", "cre"),
+           comment = c(ORCID = "0000-0001-6754-0659")),
+    person("ThinkR", role = "cph")
+  )
+Description: Sensory analysis tools that will be used fot a demo purpose
+    at sensometrics 2024.
+License: MIT + file LICENSE
+Imports: 
+    dplyr,
+    FactoMineR,
+    glue,
+    grDevices,
+    lubridate,
+    plotly,
+    purrr,
+    stats,
+    tibble,
+    tidyr
+Suggests: 
+    knitr,
+    rmarkdown,
+    testthat
+VignetteBuilder: 
+    knitr
+Config/fusen/version: 0.5.2
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.1

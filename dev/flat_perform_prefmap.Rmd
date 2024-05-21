@@ -1,0 +1,275 @@
+---
+title: "flat_get_prefmap.Rmd empty"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r development, include=FALSE}
+library(testthat)
+library(tibble)
+library(purrr)
+```
+
+```{r development-load}
+# Load already included functions if relevant
+pkgload::load_all(export_all = FALSE)
+```
+
+# Link sensory profiles and hedonic data through a preference mapping
+
+The preference mapping is based on the results of the MCA provided by the `get_senso_mapping()` function (see article *"Represent the sensory space on a map* for more details). 
+
+The graph of individuals (i.e. products) is discretized to form a grid of fictitious products. For each `x` * `y` coordinate of these fictitious products, the liking score is predicted for each panelist. A linear regression model `liking ~ coordinate dim 1 + coordinate dim 2 + coordinate dim 1 * coordinate dim 2` is used to predict the liking score for each panelist.
+
+Then, the fictitious product is stamped "liked" if its predicted score is greater than or equal to the average of the liking scores given by the panelist. Otherwise, it is stamped "unliked". The proportion of panelists who liked each fictitious product in the grid is then calculated. This value is projected onto the map using a response surface.
+
+This graph is displayed in an interactive format.
+
+```{r function-get_prefmap}
+#' Perform the preference mapping
+#'
+#' @param res_mapping List. Result of the get_senso_mapping() function.
+#' @param data_hedonic Dataframe. Hedonic data.
+#' @param color_min Character. Color for "do not like".
+#' @param color_max Character. Color for "like".
+#' @param resolution Integer. Resolution for the interactive plot.
+#' 
+#' @importFrom tibble tibble
+#' @importFrom tidyr pivot_wider
+#' @importFrom purrr map reduce
+#' @importFrom grDevices colorRampPalette
+#' @importFrom plotly add_trace
+#' @importFrom dplyr distinct pull
+#'
+#' @return A plotly preference mapping plot
+#' @export
+get_prefmap <- function(res_mapping,
+                        data_hedonic,
+                        color_min = "white",
+                        color_max = "#55B4D2", 
+                        resolution = 200) {
+
+  # Check parameters
+  if (isFALSE(inherits(res_mapping, "list"))) {
+    stop(
+      "Are you sure the parameter 'res_mapping' is returned by the get_senso_mapping() function?"
+    )
+  } else {
+    if (any(names(res_mapping) != c("res_mca", "coord_prod", "coord_attr", "vec_info_tooltip", "inter_plot"))) {
+      stop(
+        "Are you sure the parameter 'res_mapping' is returned by the get_senso_mapping() function?"
+      )
+    } else {
+      if (isFALSE(inherits(res_mapping$res_mca, "MCA")) |
+          isFALSE(inherits(res_mapping$coord_prod, "data.frame")) |
+          isFALSE(inherits(res_mapping$coord_attr, "data.frame")) |
+          isFALSE(inherits(res_mapping$vec_info_tooltip, "glue")) |
+          isFALSE(inherits(res_mapping$inter_plot, "plotly"))) {
+        stop(
+          "Are you sure the parameter 'res_mapping' is returned by the get_senso_mapping() function?"
+        )
+      }
+    }
+  }
+  
+  if (isFALSE(is.data.frame(data_hedonic))) {
+    stop("The data 'data_hedonic' you provided is not a dataframe.")
+  }
+  
+  # Create a grid to compute the surface response
+  ## -- Find the coordinates for the 2 first dimensions
+  coord_prod <- res_mapping$coord_prod
+  vec_x1 <- coord_prod[, "dim1"]
+  vec_x2 <- coord_prod[, "dim2"]
+  
+  ## -- Get the interaction between 1st & 2nd coordinate
+  data_coord_real <- tibble(
+    dim1 = vec_x1,
+    dim2 = vec_x2
+  ) |>
+    mutate(
+      dim1dim2 = scale(dim1, center = TRUE, scale = FALSE) * scale(dim2, center = TRUE, scale = FALSE)
+    )
+  
+  ## -- Get the coordinates for the grid (depending on resolution)
+  size_x1 <- diff(range(vec_x1))
+  size_x2 <- diff(range(vec_x2))
+  grid_by <- max(size_x1, size_x2) / resolution
+  vec_grid_x1 <- seq(
+    from = (min(vec_x1) - size_x1 * 0.05), 
+    to = (max(vec_x1) + size_x1 * 0.05), 
+    by = grid_by
+  ) 
+  vec_grid_x2 <- seq(
+    from = (min(vec_x2) - size_x2 * 0.05),
+    to = (max(vec_x2) + size_x2 * 0.05), 
+    by = grid_by
+  )
+  
+  ## -- Create the grid
+  data_grid <- expand.grid(
+    dim1 = vec_grid_x1, 
+    dim2 = vec_grid_x2
+  ) |>
+    mutate(
+      dim1dim2 = scale(dim1, center = TRUE, scale = FALSE) * scale(dim2, center = TRUE, scale = FALSE)
+    )
+
+  # Get the proportion of panelists who like a given fictional product
+  ## -- Tranform the hedonic dataset to a large dataset
+  data_hedonic_large <- data_hedonic |> 
+  pivot_wider(
+    names_from = consumer,
+    values_from = score
+  )
+  
+  ## -- Predict if the panelists like a given fictional product of the grid
+  ## -- Get the proportion of panelists who like a given fictional product
+  vec_names_panelists <- data_hedonic |>
+    distinct(consumer) |>
+    pull()
+  
+  prop_predict_like_grid <- vec_names_panelists |> 
+    map(
+      ~ predict_like(
+          data_coord_real = data_coord_real,
+          data_grid = data_grid,
+          data_hedonic_large = data_hedonic_large,
+          panelist_name = .x
+      )
+    ) |>  
+    reduce(`+`) / length(vec_names_panelists) * 100
+  
+  data_surface_response <- tibble(
+    dim1 = data_grid$dim1, 
+    dim2 = data_grid$dim2,
+    prop_predict_like = as.vector(prop_predict_like_grid)
+  )
+  
+  # Plot the preference mapping
+  ## -- Get the colors palette
+  colors_palette <- tibble(
+    range = c(0, 1),
+    colors = c(color_min, color_max)
+  )
+  
+  ## -- Add the surface response to the individual plot
+  inter_plot_prefmap_surf <- res_mapping$inter_plot |>
+    add_trace(
+      data = data_surface_response,
+      x = ~ dim1,
+      y = ~ dim2,
+      hoverinfo = 'text',
+      z = ~ prop_predict_like,
+      type = "contour",
+      contours = list(
+        showlabels = TRUE, 
+        start = 0, 
+        end = 100, 
+        coloring = "heatmap"
+        ),
+      line = list(color = "white"),
+      colorscale = colors_palette,
+      hoverinfo = "none",
+      hoverlabel = list(bgcolor = "black", font = list(color = "white")),
+      colorbar = list(
+        len = 1,
+        lenmode = "fraction",
+        title = "% of consumers\nwho like the product")
+    )
+  
+  ## -- Add info about products
+  inter_plot_prefmap <- inter_plot_prefmap_surf |> 
+    add_trace(
+      data = coord_prod |>
+        mutate(product = rownames(coord_prod)),
+      x = ~ dim1 ,
+      y = ~ dim2,
+      hoverinfo = 'text',
+      text = res_mapping$vec_info_tooltip,
+      type = "scatter",
+      mode = "markers",
+      marker = list(size = 6, color = "black"),
+      showlegend = FALSE
+    )
+    
+  return(inter_plot_prefmap)
+  
+}
+```
+
+```{r examples-get_prefmap}
+data("data_sensory_toy")
+data("data_products_toy")
+data("data_hedonic_toy")
+
+res_mapping <- get_senso_mapping(
+  data_sensory = data_sensory_toy |> rename_with(tolower),
+  data_products = data_products_toy |> rename_with(tolower)
+)
+
+get_prefmap(
+  res_mapping = res_mapping,
+  data_hedonic = data_hedonic_toy |> rename_with(tolower)
+)
+```
+
+```{r tests-get_prefmap}
+test_that("get_prefmap works", {
+
+  data("data_sensory_toy")
+  data("data_products_toy")
+  data("data_hedonic_toy")
+  
+  res_mapping <- get_senso_mapping(
+    data_sensory = data_sensory_toy |> rename_with(tolower),
+    data_products = data_products_toy |> rename_with(tolower)
+  )
+  
+  plot_prefmap <- get_prefmap(
+    res_mapping = res_mapping,
+    data_hedonic = data_hedonic_toy |> rename_with(tolower)
+  )
+  
+  expect_true(inherits(plot_prefmap, "plotly"))
+  
+  # Test an error is the parameter is not a get_senso_mapping result
+  expect_error(
+    object = get_prefmap(
+      res_mapping = 1,
+      data_hedonic = data_hedonic_toy
+    ),
+    regexp = "Are you sure the parameter 'res_mapping'"
+  )
+  
+  expect_error(
+    object = get_prefmap(
+      res_mapping = list(a = 1, b = 2, c = 3, d = 4, e = 1),
+      data_hedonic = data_hedonic_toy
+    ),
+    regexp = "Are you sure the parameter 'res_mapping'"
+  )
+  
+  # Test an error is the parameter is not a dataframe
+  expect_error(
+    object = get_prefmap(
+      res_mapping = res_mapping,
+      data_hedonic = 1), 
+    regexp = "The data 'data_hedonic' you provided is not a dataframe"
+  )
+
+})
+```
+
+```{r development-inflate, eval=FALSE}
+# Run but keep eval=FALSE to avoid infinite loop
+# Execute in the console directly
+fusen::inflate(
+  flat_file = "dev/flat_perform_prefmap.Rmd", 
+  vignette_name = "Link the sensory space and the liking to detect an optimum product",
+  check = FALSE,
+  overwrite = TRUE,
+  open_vignette = FALSE
+)
+```

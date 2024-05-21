@@ -1,0 +1,161 @@
+---
+title: "Sensory report"
+subtitle: "Representing the products on a sensory map and linking the sensory description and liking scores"
+description: "Code available on GitHub: https://github.com/ThinkR-open/sensometrics"
+author: "Margot"
+date: today
+date-format: long
+title-block-banner: "#55B4D2"
+format:
+  html:
+    toc: true
+    toc-location: right
+    theme: 
+      - cerulean
+      - custom.scss
+    code-fold: true
+    embed-resources: true
+execute: 
+  echo: false
+---
+
+```{r}
+#| include: false
+library(readxl)
+library(dplyr)
+library(tidyr)
+# library(sensometrics)
+pkgload::load_all()
+library(DT)
+library(stringr)
+library(shiny)
+library(knitr)
+```
+
+> The aim of this report is to determine the sensory profile of the optimum product. This is done by linking sensory data obtained during a sorting task, and hedonic data. The methodology used to collect the data is summarized below.
+
+::: {.callout-warning appearance="simple" title="About the data"}
+*Note that fictive sensory data (sorting task in pre-defined groups) and hedonic data are used in this report. They are only used for demonstration purposes.*
+:::
+
+```{r}
+#| include: false
+# Read the datasets
+data_info_products <- read_excel(
+  "data/data_info_products_20240425.xlsx"
+)
+
+data_sorting_task <- read_excel(
+  "data/data_sorting_task_20240425.xlsx"
+)
+data_sorting_task_long <- data_sorting_task |>
+  pivot_longer(
+    cols = - product,
+    names_to = "consumer", 
+    values_to = "group"
+  )
+
+data_liking <- read_excel(
+  "data/data_liking_20240425.xlsx"
+)
+
+# Detect the date of the session
+date_session <- get_date_from_file_name(
+  file = "data/data_info_products_20240425.xlsx"
+)
+
+# Get the number of products
+nb_products <- nrow(data_sorting_task)
+
+# Get the number of consumers who performed the sorting task
+nb_consumers_sorting_task <- ncol(data_sorting_task) - 1
+
+# Get the number of sensory attributes involved in the sorting task
+nb_attributes <- data_sorting_task_long |> 
+  distinct(group) |> 
+  count() |> 
+  pull()
+  
+# Get the number of consumers who provided liking scores
+nb_consumers_liking <- data_liking |> 
+  distinct(consumer) |> 
+  count() |> 
+  pull()
+```
+
+## General information
+
+|                                                                    |     |                                                            |
+|:-------------------------------------------------------------------|-----|:-----------------------------------------------------------|
+| Session date: `r date_session`                                     |     |                                                            |
+| Number of products: `r nb_products`                                |     | Number of sensory attributes: `r nb_attributes`            |
+| Number of consumers (sorting task): `r nb_consumers_sorting_task`  |     | Number of consumers (liking task): `r nb_consumers_liking` |
+
+## Methodology
+
+Screenshot
+
+## Products
+
+```{r}
+data_info_products |>
+  datatable()
+```
+
+## Representing the sensory space on a map
+
+Two products are all the closer (resp. further apart) the more similar (resp. different) their sensory profiles. The closer (resp. farther) a product is to a sensory attribute, the more times (resp. few times) it has been used to describe it.
+
+::: {.callout-note title="More details about the statistical analysis" collapse=true}
+A Multiple Correspondence Analysis is realized. The graph of individuals (i.e. products) and attributes are displayed in an interactive format.
+:::
+
+```{r}
+res_senso_mapping <- get_senso_mapping(
+  data_sensory = data_sorting_task_long, 
+  data_products = data_info_products
+)
+```
+
+::: {.panel-tabset}
+
+## Plot
+
+```{r}
+res_senso_mapping$inter_plot
+```
+
+## Eigenvalues
+
+```{r}
+res_senso_mapping$res_mca$eig |> 
+  kable(
+    digits = 2
+  )
+```
+
+## Products contributions
+
+```{r}
+res_senso_mapping$res_mca$ind$contrib |> 
+  kable(
+    digits = 2
+  )
+```
+
+:::
+
+## Locating an optimum product within the product space
+
+::: {.callout-note title="More details about the statistical analysis" collapse=true}
+The graph of individuals (i.e. products) obtained previously is discretized to form a grid of fictitious products. For each `x` * `y` coordinate of these fictitious products, the liking score is predicted for each panelist. A linear regression model `liking ~ coordinate dim 1 + coordinate dim 2 + coordinate dim 1 * coordinate dim 2` is used to predict the liking score for each panelist. 
+
+Then, the fictitious product is stamped "liked" if its predicted score is greater than or equal to the average of the liking scores given by the panelist. Otherwise, it is stamped "unliked". The proportion of panelists who liked each fictitious product in the grid is then calculated. This value is projected onto the map using a response surface.
+:::
+
+```{r}
+get_prefmap(
+  res_mapping = res_senso_mapping,
+  data_hedonic = data_liking
+)
+```
