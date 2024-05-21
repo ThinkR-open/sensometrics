@@ -97,13 +97,34 @@ nb_consumers_liking <- data_liking |>
 
 ## Methodology
 
-Screenshot
+![Methodology used to collect the data](images/methodology.png){fig-align="center"}
 
 ## Products
 
 ```{r}
 data_info_products |>
   datatable()
+```
+
+## Data
+
+### Sensory data
+
+```{r}
+kable(
+  data_sorting_task
+)
+```
+
+### Hedonic data
+
+```{r}
+data_liking |> 
+  pivot_wider(
+    names_from = consumer, 
+    values_from = score
+  ) |> 
+  kable()
 ```
 
 ## Representing the sensory space on a map
