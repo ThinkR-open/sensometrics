@@ -17,6 +17,8 @@ format:
     embed-resources: true
 execute: 
   echo: false
+params:
+  path_to_data_folder: "data/20240425"
 ---
 
 ```{r}
@@ -24,8 +26,7 @@ execute:
 library(readxl)
 library(dplyr)
 library(tidyr)
-# library(sensometrics)
-pkgload::load_all()
+library(sensometrics)
 library(DT)
 library(stringr)
 library(shiny)
@@ -41,13 +42,16 @@ library(knitr)
 ```{r}
 #| include: false
 # Read the datasets
+path_to_data <- params$path_to_data_folder
+
 data_info_products <- read_excel(
-  "data/data_info_products_20240425.xlsx"
+  file.path(path_to_data, "data_info_products.xlsx")
 )
 
 data_sorting_task <- read_excel(
-  "data/data_sorting_task_20240425.xlsx"
+  file.path(path_to_data, "data_sorting_task.xlsx")
 )
+
 data_sorting_task_long <- data_sorting_task |>
   pivot_longer(
     cols = - product,
@@ -56,12 +60,12 @@ data_sorting_task_long <- data_sorting_task |>
   )
 
 data_liking <- read_excel(
-  "data/data_liking_20240425.xlsx"
+  file.path(path_to_data, "data_liking.xlsx")
 )
 
 # Detect the date of the session
-date_session <- get_date_from_file_name(
-  file = "data/data_info_products_20240425.xlsx"
+date_session <- get_date_from_folder_name(
+  path_to_data
 )
 
 # Get the number of products

@@ -15,58 +15,58 @@ library(lubridate)
 pkgload::load_all(export_all = FALSE)
 ```
 
-# Get the date of the session from file name
+# Get the date of the session from folder name
 
-The date of the session is extracted from the name of the file. This mode of operation assumes that all file names are standardized.
+The date of the session is extracted from the name of the folder. This mode of operation assumes that all structures of files/folders names are standardized.
     
-```{r function-get_date_from_file_name}
-#' Get the date of the session from file name
+```{r function-get_date_from_folder_name}
+#' Get the date of the session from folder name
 #' 
-#' @param file Character. Path of a file containing the date inside its name.
+#' @param path Character. Path of a folder containing the date inside its name.
 #' 
 #' @importFrom lubridate ymd
 #' 
 #' @return Date
 #' 
 #' @export
-get_date_from_file_name <- function(file){
+get_date_from_folder_name <- function(path){
   
   regmatches(
-    basename(file),
-    regexpr("\\d{8}", basename(file))
+    path,
+    regexpr("\\d{8}", path)
   ) |> 
   ymd()
     
 }
 ```
   
-```{r example-get_date_from_file_name}
-get_date_from_file_name(
-  file = "data/data_info_products_20240425.xlsx"
+```{r example-get_date_from_folder_name}
+get_date_from_folder_name(
+  path = "data/20240425"
 )
 ```
   
-```{r tests-get_date_from_file_name}
-test_that("get_date_from_file_name works", {
+```{r tests-get_date_from_folder_name}
+test_that("get_date_from_folder_name works", {
   
   expect_equal(
-    get_date_from_file_name(
-      file = "data/data_info_products_20240425.xlsx"
+    get_date_from_folder_name(
+      path = "data/20240425"
     ), 
-    "20240425"
+    as.Date("2024-04-25")
   )
   
   expect_equal(
-    get_date_from_file_name(
-      file = "data/data_info_products_20240621.xlsx"
+    get_date_from_folder_name(
+      path = "data/20240621"
     ), 
-    "20240621"
+    as.Date("2024-06-21")
   )
   
 })
 ```
 
-# `predict_like()`: Predict if a given panelist likes a given fictional product or not
+# Predict if a given panelist likes a given fictional product or not
     
 ```{r function-predict_like}
 #' Predict if a given panelist likes a given fictional product or not
@@ -393,6 +393,111 @@ test_that("predict_like works", {
                ))
 
   # end of long dput ----
+
+})
+```
+
+# Create the report
+
+```{r function-create_report}
+#' Create the reproducible HTML sensory report
+#'
+#' @param date path_to_data_folder. Path to data folder.
+#' @param session Character. ID of the sensory session.
+#' @param products Character. Vector of products to include into the report.
+#' @param output_dir Character. Path of the folder to save the report.
+#' @param report_template Character. Path of the folder containing the report template.
+#' 
+#' @importFrom withr with_dir
+#' @importFrom quarto quarto_render
+#' 
+#' @return A list with the folder and the file of the created report.
+#' 
+#' @export
+create_report <- function(path_to_data_folder,
+                          output_dir,
+                          report_template = system.file(
+                            "report",
+                            package = "sensometrics"
+                          )) {
+  
+  # Create the list of parameters
+  list_param_report <- list(
+    path_to_data_folder = path_to_data_folder
+  )
+  
+  # Move the .qmd template into the temp directory
+  fs::dir_copy(
+    path = report_template,
+    new_path = output_dir
+  )
+
+  # Render the report
+  with_dir(
+    file.path(output_dir, basename(report_template)), {
+      quarto_render(
+        input = "sensometrics_param_report.qmd",
+        execute_params = list_param_report,
+        quiet = TRUE
+      )
+  })
+  
+  return(
+    list(
+      output_dir_report = file.path(output_dir, basename(report_template)),
+      output_file_report = "sensometrics_param_report.html"
+    )
+  )
+  
+}
+```
+
+```{r examples-create_report}
+# Create a temporary directory
+my_temp_dir <- tempfile()
+dir.create(my_temp_dir)
+
+# Create the sensory report
+report <- create_report(
+  path_to_data_folder = "data/20240425",
+  output_dir = my_temp_dir
+)
+
+# Open the sensory report
+browseURL(
+  file.path(
+    report$output_dir_report, 
+    report$output_file_report
+  )
+)
+
+# Delete temporary directory
+unlink(my_temp_dir, recursive = TRUE)
+```
+
+```{r tests-create_report}
+test_that("create_report works", {
+  
+  # Create temporary directory
+  my_temp_dir <- tempfile()
+  dir.create(my_temp_dir)
+  
+  # Create the sensory report
+  report <- create_report(
+    path_to_data_folder = "data/20240425",
+    output_dir = my_temp_dir
+  )
+  
+  # Check if the file exists
+  expect_true(file.exists(
+    file.path(
+      report$output_dir_report,
+      report$output_file_report
+    )
+  ))
+  
+  # Delete temporary directory
+  unlink(my_temp_dir, recursive = TRUE)
 
 })
 ```

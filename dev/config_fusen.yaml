@@ -28,11 +28,13 @@ flat_utils.Rmd:
   path: dev/flat_utils.Rmd
   state: active
   R:
-  - R/get_date_from_file_name.R
+  - R/create_report.R
+  - R/get_date_from_folder_name.R
   - R/predict_like.R
   tests:
-  - tests/testthat/test-get_date_from_file_name.R
+  - tests/testthat/test-get_date_from_folder_name.R
   - tests/testthat/test-predict_like.R
+  - tests/testthat/test-create_report.R
   vignettes: []
   inflate:
     flat_file: dev/flat_utils.Rmd

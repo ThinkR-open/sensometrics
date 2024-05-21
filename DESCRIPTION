@@ -13,14 +13,17 @@ License: MIT + file LICENSE
 Imports: 
     dplyr,
     FactoMineR,
+    fs,
     glue,
     grDevices,
     lubridate,
     plotly,
     purrr,
+    quarto,
     stats,
     tibble,
-    tidyr
+    tidyr,
+    withr
 Suggests: 
     knitr,
     rmarkdown,
